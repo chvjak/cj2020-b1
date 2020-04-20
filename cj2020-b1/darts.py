@@ -28,12 +28,13 @@ class MyJudge:
 
 #JUDGE = MyJudge(R=10**9 - 50, X=11, Y=12)
 #JUDGE = MyJudge((10 ** 9) - 5, X=0, Y=0)
-#JUDGE = MyJudge((10 ** 9) - 5, X=5, Y=-5)
+JUDGE = MyJudge((10 ** 9) - 5, X=5, Y=-5)
 
 #JUDGE = MyJudge((10 ** 9) - 50, X=-50, Y=50)
 #JUDGE = MyJudge((10 ** 9) - 50, X=0, Y=0)
 
-JUDGE = MyJudge( (10 ** 9) // 2, X=0, Y=50)
+#JUDGE = MyJudge(100, X=-999999900, Y=-999999900)
+#JUDGE = MyJudge(5*10**8, X=-5*10**8, Y=-5*10**8)
 
 
 def Log(msg):
@@ -79,6 +80,9 @@ class FunctionX:
         self.jc.send(x, self.y)
         response = self.jc.read()
 
+        if response == "CENTER":
+            raise UnexpectedCenterFound()
+
         return 1 if response == "HIT" else -1 if response == "MISS" else 0
 
 class FunctionY:
@@ -89,6 +93,9 @@ class FunctionY:
     def __call__(self, y):
         self.jc.send(self.x, y)
         response = self.jc.read()
+
+        if response == "CENTER":
+            raise UnexpectedCenterFound()
 
         return 1 if response == "HIT" else -1 if response == "MISS" else 0
 
@@ -105,85 +112,129 @@ def bsect(a, b, f):
 
     return a
 
+class UnexpectedCenterFound(Exception):
+    pass
+
 if not DEBUG:
     Log("Reading input")
     T, MinR, MaxR = [int(x) for x in f.readline().split(" ")]
     Log("Read {0}, {1}, {2}".format(T, MinR, MaxR))
 else:
-    T = 1
+    T = 2
     MinR = JUDGE.R
 
 MAX = 10 ** 9
 jc = JudgeClient()
 fx = FunctionX(jc)
 fy = FunctionY(jc)
+
 for t in range(T):
-    jc.i = 0
-    # find a point inside the dart board, it is only trickier than that for test case 3
-    # probably better find the point closer to circle
-    circle_fit_times = int(MAX / MinR); #2Max / 2R
-    for r in range(circle_fit_times):
-        for c in range(circle_fit_times):
-            x0, y0 = MinR // 2 + r * MinR, MinR // 2 + c * MinR
-            jc.send(x0, y0)
-            response = jc.read()
+    try:
+        jc.i = 0
+
+        # find a point inside the dart board
+        circle_fit_times = int(MAX / MinR); #2 Max / 2R
+        for r in range(circle_fit_times):
+            for c in range(circle_fit_times):
+                x0, y0 = -MAX + MinR // 2 + r * MinR, -MAX + MinR // 2 + c * MinR
+                jc.send(x0, y0)
+                response = jc.read()
+                if response == "HIT":
+                    break
+                else:
+                   if response == "CENTER":
+                    raise UnexpectedCenterFound()
             if response == "HIT":
                 break
-        if response == "HIT":
-            break
+        else:
+            jc.send(MAX * 4, MAX * 4)
+            sys.exit(1)
 
+        # we fix y==y0
+        fx.y = y0
 
+        # while we are not out of circle, do bs looking for X of intersection
+        a = -MAX
+        b = x0  
+        A = bsect(a, b, fx) if fx(a) == -1 else a
 
+        # Find second intersection of chord
+        a = x0
+        b = MAX 
+        B = bsect(a, b, fx)  if fx(b) == -1 else b
 
-    # we keep y
-    # while we are not out of circle, do bs looking for X of intersection
-    a = -MAX
-    b = x0
+        # Find perpendicular to chord intersections
+        # we fix x equal to center of chord
+        fy.x = (A + B) // 2
 
-    fx.y = y0
-    
-    
-    A = bsect(a, b, fx) if fx(a) == -1 else a
+        a = y0
+        b = MAX 
+        C = bsect(a, b, fy) if fy(b) == -1 else b
 
-    # Find second intersection of chord
-    a = x0
-    b = MAX 
-    B = bsect(a, b, fx)  if fx(b) == -1 else b
+        MB = abs(A - B) // 2
+        MC = abs(C - y0)
 
-    # Find perpendicular to chord intersections
-    fy.x = (A + B) // 2
+        if MC == 0:
+            a = y0
+            b = -MAX 
+            D = bsect(a, b, fy) if fy(b) == -1 else b
 
-    a = y0
-    b = MAX 
-    C = bsect(a, b, fy) if fy(b) == -1 else b
+            MD = abs(D - y0)
+        else:
+            MD = MB * MB / MC
 
-    #May be we can live with only C:
-    MB = abs(A - B) // 2
-    MC = abs(C - y0)
-    
-    MD = MB * MB / MC
-    diameter = MD + MC
+        xc = A + MB
+        yc = C - (MD + MC) // 2
 
-    xc = A + MB
-    yc = C - (MD + MC) // 2
-
-       
-    for x1, y1 in [(xc, yc), (xc - 1, yc -1), (xc, yc - 1), (xc + 1, yc - 1), (xc + 1, yc), (xc + 1, yc + 1), (xc, yc + 1), (xc - 1, yc + 1)]:
-        jc.send(x1, y1)
+        jc.send(xc, yc)
         response = jc.read()
+        if response != "CENTER":
+            # start growing the square around xc, yc
+            S = 3
+            while True:
+                T = yc + S // 2
+                B = yc - S // 2
+                L = xc - S // 2
+                R = xc + S // 2
 
-        if response == "CENTER":
-            break
+                points = []
 
-#TODO: Fix border cases in x0, y0 search. 
-# 1. What if we are on the edge?
-# 2. What if we hit center?
-    
+                # bootom of square
+                points += [(L + i, B) for i in range(S)]
+
+                # top of square
+                points += [(L + i, T)  for i in range(S)]
+
+                # left edge
+                points += [(L, B + i)  for i in range(S)]
+
+                # right edge
+                points += [(R, B + i)  for i in range(S)]
+                    
+                for x1, y1 in points:
+                    jc.send(x1, y1)
+                    response = jc.read()
+                    if response == "CENTER":
+                        break
+
+                if response == "CENTER":
+                    break
+                else:
+                    S += 2
+
+    except UnexpectedCenterFound:
+        Log("UnexpectedCenterFound")
+
+   
 # Biggest delays
 # 1) error in bsect - missing abs()
 # 2) interactive debugger 
 #   doesn't report error if wrong path
 #   python path was not set after reinstall :(
-#   python started from vs has weird arguments and doesn't run as expected
+#   python started from vs has weird arguments and doesn't run as expected BUT not on the laptop
+# 3) border cases
+#       circle can overlap the border
+#       accidental hit of center / border
+# 4) HUGE: RE on last test case
 
-#python C:\Users\Dmytro\source\repos\cj2020-b1\cj2020-b1\interactive_runner.py python C:\Users\Dmytro\source\repos\cj2020-b1\cj2020-b1\testing_tool.py 0 -- python C:\Users\Dmytro\source\repos\cj2020-b1\cj2020-b1\darts.py
+#python C:\Users\Dmytro\source\repos\cj2020-b1\cj2020-b1\interactive_runner.py python C:\Users\Dmytro\source\repos\cj2020-b1\cj2020-b1\testing_tool.py 2 -- python C:\Users\Dmytro\source\repos\cj2020-b1\cj2020-b1\darts.py

@@ -23,7 +23,7 @@ D = 300
 # command line parameter.
 CASES = [[((0, 0), (10 ** 9) - 5), ((5, -5), (10 ** 9) - 5)],
          [((0, 0), (10 ** 9) - 50), ((-50, 50), (10 ** 9) - 50)],
-         [((0, 50), (10 ** 9) // 2), ((0, 0), (10 ** 9))]]
+         [ ((-5*10**8, -5*10**8), 5*10**8), ((0, 50), (10 ** 9) // 2), ((0, 0), (10 ** 9))]]
 
 
 class Error(Exception):
@@ -61,6 +61,7 @@ def ReadValues(line):
   x = ParseInteger(parts[0])
   y = ParseInteger(parts[1])
   if not -MAXX <= x <= MAXX:
+    print("OUT_OF_BOUNDS_ERROR", file=sys.stderr)
     raise Error(OUT_OF_BOUNDS_ERROR(x))
   if not -MAXX <= y <= MAXX:
     raise Error(OUT_OF_BOUNDS_ERROR(y))
@@ -111,11 +112,15 @@ def RunCase(d, c, r, test_input=None, test_output_storage=None):
 def RunCases(d, minr, maxr, cases, test_input=None, test_output_storage=None):
   Output("{} {} {}".format(len(cases), minr, maxr))
   for i, (c, r) in enumerate(cases, 1):
+    print(minr <= r <= maxr, file=sys.stderr)
+    print(all(-MAXX + r <= x <= MAXX - r for x in c), file=sys.stderr)
+    print("{2} <= {0} <= {3} and all(-{1} + {0} <= x <= {1} - {0} for x in c)".format(r, MAXX, minr, maxr), file=sys.stderr)
     assert minr <= r <= maxr and all(-MAXX + r <= x <= MAXX - r for x in c)
     try:
       RunCase(d, c, r, test_input=test_input,
               test_output_storage=test_output_storage)
     except Error as err:
+      print("ERROR", file=sys.stderr)
       Output(WRONG)
       raise Error(CASE_ERROR(i, err))
   try:
@@ -143,6 +148,7 @@ def main():
     RunCases(D, minr, maxr, cases)
     print("Finished running all cases succesfully!", file=sys.stderr)
   except Error as err:
+    print("ERROR. Exiting...", file=sys.stderr)
     print(str(err)[:1000], file=sys.stderr)
     sys.exit(1)
 
