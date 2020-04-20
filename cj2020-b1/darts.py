@@ -133,10 +133,10 @@ for t in range(T):
         jc.i = 0
 
         # find a point inside the dart board
-        circle_fit_times = int(MAX / MinR); #2 Max / 2R
+        circle_fit_times = int(2 * MAX / MinR); #2 Max / 2R
         for r in range(circle_fit_times):
             for c in range(circle_fit_times):
-                x0, y0 = -MAX + MinR // 2 + r * MinR, -MAX + MinR // 2 + c * MinR
+                x0, y0 = -MAX + r * MinR, -MAX + c * MinR
                 jc.send(x0, y0)
                 response = jc.read()
                 if response == "HIT":
@@ -147,8 +147,9 @@ for t in range(T):
             if response == "HIT":
                 break
         else:
+            # should not happen
             jc.send(MAX * 4, MAX * 4)
-            sys.exit(1)
+            #sys.exit(1)
 
         # we fix y==y0
         fx.y = y0
@@ -236,5 +237,6 @@ for t in range(T):
 #       circle can overlap the border
 #       accidental hit of center / border
 # 4) HUGE: RE on last test case
+#       incorrecly calculated the grid / did not visualised/envisioned
 
 #python C:\Users\Dmytro\source\repos\cj2020-b1\cj2020-b1\interactive_runner.py python C:\Users\Dmytro\source\repos\cj2020-b1\cj2020-b1\testing_tool.py 2 -- python C:\Users\Dmytro\source\repos\cj2020-b1\cj2020-b1\darts.py
